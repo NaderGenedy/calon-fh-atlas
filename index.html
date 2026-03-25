@@ -63,6 +63,13 @@ body{font-family:Arial,Helvetica,sans-serif;background:#0a0a1a;color:#e0e0e0}
 .pen-bar{height:20px;border-radius:4px;background:#222;position:relative;margin-top:4px}
 .pen-bar .fill{height:100%;border-radius:4px}
 .pen-bar .text{position:absolute;right:6px;top:2px;font-size:11px;color:#fff}
+.expl-box{background:linear-gradient(135deg,#0d1b2a 0%,#1b2838 100%);border:1px solid #1e88e5;border-radius:10px;padding:20px;margin-top:20px}
+.expl-pathway{display:flex;flex-direction:column;gap:0}
+.expl-step{display:flex;gap:15px;padding:15px 0;border-left:3px solid #1e88e5;margin-left:15px;padding-left:20px;position:relative}
+.expl-step:last-child{border-left-color:transparent}
+.expl-step::before{content:'';position:absolute;left:-7px;top:15px;width:11px;height:11px;border-radius:50%;background:#1e88e5;border:2px solid #0d1b2a}
+.expl-icon{font-size:24px;flex-shrink:0;width:35px;text-align:center}
+.expl-text{font-size:14px;line-height:1.6;color:#cfd8dc}
 </style>
 </head>
 <body>
@@ -205,6 +212,109 @@ function getPenBar(pct){
   return '<div class="pen-bar"><div class="fill" style="width:'+Math.min(pct,100)+'%;background:'+color+'"></div><div class="text">'+pct+'%</div></div>';
 }
 
+function getMolExplanation(d){
+  var pos=d.amino_acid_pos;
+  var aa=d.wt_aa;
+  var dom=d.domain;
+  var mc=d.mech_class;
+  var bs=d.binding_site;
+  var contact=d.ldl_contact;
+  var pcsk9=d.at_pcsk9;
+  var ddg=d.max_ddg;
+  var pen=d.penetrance_60;
+  var jensson=d.jensson_years;
+
+  // Step-by-step pathway explanation
+  var steps=[];
+  var icon_dna='<span style="font-size:20px">&#x1F9EC;</span>';
+  var icon_protein='<span style="font-size:20px">&#x1F9EA;</span>';
+  var icon_receptor='<span style="font-size:20px">&#x1F50D;</span>';
+  var icon_ldl='<span style="font-size:20px">&#x1F534;</span>';
+  var icon_liver='<span style="font-size:20px">&#x1FAC0;</span>';
+  var icon_artery='<span style="font-size:20px">&#x1FA78;</span>';
+  var icon_heart='<span style="font-size:20px">&#x2764;&#xFE0F;</span>';
+  var icon_rx='<span style="font-size:20px">&#x1F48A;</span>';
+
+  // 1. WHERE is this mutation?
+  var where='';
+  if(mc==='binding_failure'){
+    where='This residue sits in the <b>'+dom+'</b> domain, part of <b>Binding Site 1 (BS1)</b> &mdash; the region of the LDL receptor that physically grabs LDL cholesterol particles from the blood. This is the primary "hand" that catches LDL.';
+    if(dom==='EGF-A') where='This residue sits in the <b>EGF-A domain</b>, which serves a dual role: it is part of <b>Binding Site 1</b> that captures LDL, AND it is where <b>PCSK9</b> binds to mark the receptor for destruction. Mutations here can impair both LDL capture and PCSK9 inhibitor therapy.';
+  }else if(mc==='recycling_failure'){
+    where='This is one of only <b>4 critical pH-switch residues</b> (H211, H285, H583, H607) in the entire LDL receptor. These histidine residues act as molecular "pH sensors" &mdash; when the receptor enters the acidic endosome (pH 6.5), these residues change charge, triggering the receptor to release LDL and recycle back to the cell surface. A mutation here means the receptor <b>cannot release LDL</b> and gets degraded instead of recycled.';
+  }else if(mc==='recycling_pivot'){
+    where='This residue is in the <b>EGF-B domain</b>, which acts as the mechanical "hinge" for receptor recycling. After binding LDL and entering the cell, the receptor must fold at this hinge to release LDL in the endosome and return to the cell surface. Damage here impairs the folding mechanism.';
+  }else if(mc==='interface_BS2'){
+    where='This residue is in the <b>beta-propeller domain</b> at <b>Binding Site 2 (BS2)</b>, where a second LDL receptor molecule contacts a second LDL particle. The beta-propeller also mediates receptor recycling by folding over the ligand-binding domain at acidic pH.';
+  }else if(dom==='LA1'||dom==='LA2'){
+    where='This residue is in the <b>'+dom+'</b> domain. Crucially, cryo-EM studies (Reimund et al., Nature 2025) showed that LA1 and LA2 do <b>NOT</b> directly contact LDL particles. Mutations here primarily cause disease through <b>protein misfolding</b> &mdash; the receptor fails to fold correctly in the cell and never reaches the surface, rather than failing to bind LDL.';
+  }else if(dom==='Beta-propeller'){
+    where='This residue is in the <b>beta-propeller domain</b> (Binding Site 2). This large domain contacts the N-terminal region of apoB-100 on LDL particles, and is essential for <b>receptor recycling</b> &mdash; it folds over the ligand-binding repeats at acidic pH to release LDL inside the cell.';
+  }else if(dom==='Transmembrane'){
+    where='This residue is in the <b>transmembrane domain</b>, which anchors the receptor in the cell membrane. Mutations here can prevent the receptor from being properly inserted into the cell surface.';
+  }else if(dom==='Cytoplasmic'){
+    where='This residue is in the <b>cytoplasmic tail</b> inside the cell. This region contains the signal (NPXY motif) that tells the cell to pull the receptor into clathrin-coated pits for endocytosis. Mutations here mean the receptor sits on the surface but <b>cannot be internalised</b> &mdash; it binds LDL but cannot pull it into the cell.';
+  }else if(dom==='O-linked sugars'){
+    where='This residue is in the <b>O-linked sugar domain</b>, which acts as a rigid stalk holding the receptor above the cell surface. Sugar modifications here protect the receptor from proteolytic cleavage. Mutations may destabilise the receptor on the cell surface.';
+  }else if(dom==='EGF-C'){
+    where='This residue is in the <b>EGF-C domain</b>. This domain does not directly contact LDL but provides structural support between the beta-propeller and the O-linked sugar region.';
+  }else{
+    where='This residue is in the <b>'+dom+'</b> domain of the LDL receptor.';
+  }
+
+  // 2. WHAT happens at the protein level?
+  var protein='';
+  if(ddg!==null&&ddg>4){
+    protein='A mutation at this position causes <b>severe destabilisation</b> of the protein (ddG = '+ddg.toFixed(1)+' kcal/mol). The receptor likely <b>misfolds in the endoplasmic reticulum</b> and is destroyed before ever reaching the cell surface. This is equivalent to having no receptor at all from this gene copy.';
+  }else if(ddg!==null&&ddg>2){
+    protein='A mutation here causes <b>significant destabilisation</b> (ddG = '+ddg.toFixed(1)+' kcal/mol). The receptor may partially fold but with reduced efficiency &mdash; fewer functional receptors reach the hepatocyte surface, reducing LDL clearance capacity.';
+  }else if(ddg!==null&&ddg>1){
+    protein='A mutation here causes <b>mild destabilisation</b> (ddG = '+ddg.toFixed(1)+' kcal/mol). The receptor likely folds and reaches the surface, but may have subtly altered function or reduced stability.';
+  }else if(contact&&bs==='BS1'){
+    protein='Even without large thermodynamic destabilisation, mutations at this <b>LDL-contact residue</b> can disrupt the electrostatic interactions between the receptor and apoB-100 on the LDL particle, directly <b>weakening LDL binding affinity</b>.';
+  }else if(aa==='C'){
+    protein='This is a <b>cysteine residue</b>, which typically forms disulfide bonds critical for domain structure. Mutations of cysteine residues in the ligand-binding repeats are <b>almost always pathogenic</b> because they break the structural scaffold that holds the calcium-binding pocket together.';
+  }else{
+    protein='The structural impact at this position depends on the specific amino acid change. The wildtype residue (<b>'+aa+'</b>) contributes to local protein stability and function.';
+  }
+
+  // 3. CLINICAL consequence
+  var clinical='';
+  if(pen!==null&&pen>30){
+    clinical='Mutations in this domain show <b>'+pen+'% penetrance for ASCVD by age 60</b> in UK Biobank carriers. This is among the highest-risk domains in the receptor. These patients benefit from <b>early, aggressive lipid lowering</b>.';
+  }else if(pen!==null&&pen>20){
+    clinical='Mutations in this domain show <b>'+pen+'% penetrance for ASCVD by age 60</b>. This represents substantial cardiovascular risk requiring <b>combination therapy</b> (high-intensity statin + ezetimibe, consider PCSK9 inhibitor).';
+  }else if(pen!==null&&pen>10){
+    clinical='Mutations in this domain show <b>'+pen+'% penetrance for ASCVD by age 60</b>. While moderate, this still exceeds general population risk by several fold and warrants <b>statin therapy with close monitoring</b>.';
+  }else{
+    clinical='Limited penetrance data available for this domain. Clinical risk assessment should integrate family history, lipid levels, and imaging.';
+  }
+
+  // 4. TREATMENT implication
+  var treatment='';
+  if(mc==='binding_failure'&&dom!=='EGF-A'){
+    treatment='<b>Statins</b> work by upregulating LDLR expression via SREBP2. If this mutation causes complete loss of function (null), statins have <b>limited benefit</b> because more of a non-functional receptor does not help. <b>PCSK9 inhibitors</b> can still help if some functional receptor reaches the surface, by preventing PCSK9-mediated degradation. For null mutations, consider <b>evinacumab</b> (anti-ANGPTL3) which lowers LDL independently of the LDL receptor.';
+  }else if(dom==='EGF-A'){
+    treatment='The EGF-A domain is where <b>PCSK9 binds</b> to trigger receptor degradation. Mutations here may alter PCSK9 binding, potentially <b>reducing the efficacy of PCSK9 inhibitors</b> (evolocumab, alirocumab). Statins remain first-line, but if response is insufficient, consider <b>evinacumab</b> or <b>inclisiran</b> (PCSK9 siRNA, which reduces PCSK9 production rather than blocking binding).';
+  }else if(mc==='recycling_failure'){
+    treatment='Recycling-impaired receptors bind LDL normally but <b>cannot release it in the endosome</b>, so each receptor molecule is used only once instead of recycling ~100 times. <b>Statins</b> partially compensate by driving more receptor synthesis. <b>PCSK9 inhibitors</b> may have reduced benefit because the fundamental problem is receptor degradation after one use, not PCSK9-mediated degradation.';
+  }else if(dom==='Cytoplasmic'){
+    treatment='Mutations in the cytoplasmic tail prevent receptor internalisation (Class 5 defect). The receptor binds LDL on the surface but <b>cannot pull it into the cell</b>. <b>Statins</b> have limited value. <b>PCSK9 inhibitors</b> are also less effective because the receptor is already on the surface but non-functional for endocytosis. Consider <b>evinacumab</b> or <b>lipoprotein apheresis</b>.';
+  }else if(dom==='Beta-propeller'){
+    treatment='Beta-propeller mutations may respond to <b>statins</b> (our data shows LDL reduction from 5.06 to 3.41 mmol/L in this domain, P=0.001). <b>PCSK9 inhibitors</b> are expected to work because the PCSK9 binding site (EGF-A) is intact. This domain shows the <b>best treatment response</b> among LDLR mutation domains.';
+  }else{
+    treatment='Standard <b>high-intensity statin + ezetimibe</b> as first-line. Add <b>PCSK9 inhibitor</b> if LDL-C target not achieved. Monitor response and escalate based on achieved LDL-C.';
+  }
+
+  // 5. Jensson lifespan if available
+  var lifespan='';
+  if(jensson!==null){
+    lifespan='<div class="expl-step"><div class="expl-icon">&#x23F3;</div><div class="expl-text"><b>Population Lifespan Impact</b><br>In the Iceland deCODE study (166,281 individuals), carriers of a mutation at this position lived <b>'+Math.abs(jensson).toFixed(1)+' years '+(jensson<0?'shorter':'longer')+'</b> than non-carriers'+(d.jensson_sig?' (statistically significant, P<0.05)':' (not statistically significant at this sample size)')+'. This provides real-world evidence of this position\'s clinical importance.</div></div>';
+  }
+
+  return '<div class="expl-box"><h3 style="color:#64b5f6;margin-bottom:15px">&#x1F52C; Molecular Explanation for Cardiologists</h3><div class="expl-pathway"><div class="expl-step"><div class="expl-icon">&#x1F9EC;</div><div class="expl-text"><b>Step 1: Where is this mutation?</b><br>'+where+'</div></div><div class="expl-step"><div class="expl-icon">&#x1F9EA;</div><div class="expl-text"><b>Step 2: What happens to the protein?</b><br>'+protein+'</div></div><div class="expl-step"><div class="expl-icon">&#x1F534;</div><div class="expl-text"><b>Step 3: Effect on LDL clearance</b><br>'+(mc==='binding_failure'?'The liver cell cannot efficiently <b>grab LDL from the blood</b>. LDL particles that would normally be captured and cleared continue circulating, accumulating in the bloodstream and depositing cholesterol in artery walls.':mc==='recycling_failure'?'The receptor binds LDL normally but <b>cannot recycle</b>. Normally, one receptor clears ~100 LDL particles in its lifetime. Without recycling, each receptor is destroyed after one use, dramatically reducing the liver\'s LDL clearance capacity.':mc==='recycling_pivot'?'The mechanical hinge for receptor recycling is impaired. The receptor may bind and internalise LDL, but <b>recycling efficiency is reduced</b>, leading to fewer functional receptors on the surface over time.':'The receptor may have <b>reduced surface expression</b> due to misfolding, meaning fewer "hands" are available on the liver cell to catch LDL from the blood.')+'</div></div><div class="expl-step"><div class="expl-icon">&#x1FA78;</div><div class="expl-text"><b>Step 4: Cardiovascular consequence</b><br>'+clinical+'<br><br>Elevated circulating LDL leads to <b>subendothelial retention</b> in artery walls. The same region of apoB-100 that binds the LDL receptor also binds arterial proteoglycans (Boren et al., Nat Rev Cardiol 2025). Retained LDL triggers inflammation, foam cell formation, and progressive atherosclerotic plaque development.</div></div><div class="expl-step"><div class="expl-icon">&#x1F48A;</div><div class="expl-text"><b>Step 5: Treatment implications</b><br>'+treatment+'</div></div>'+lifespan+'</div></div>';
+}
+
 function showPosition(pos){
   var d=DATA.atlas[pos];
   if(!d)return;
@@ -227,7 +337,7 @@ function showPosition(pos){
   if(d.reimund_site){
     reimund='<div class="field"><div class="label">Reimund et al. Nature 2025 - Cryo-EM Binding Interface</div><div class="value highlight">'+d.reimund_site+'</div><div class="value">'+(d.reimund_func||'N.D.')+'</div></div>';
   }
-  card.innerHTML='<div class="card"><h3>Position '+pos+': '+d.wt_aa+' - '+d.domain+'</h3><div style="margin-bottom:12px"><span class="notation" style="font-size:18px">'+d.p_notation+'</span> &nbsp; <span class="notation" style="font-size:18px">'+d.c_notation+'</span> &nbsp; <span style="color:#888;font-size:13px">Amino acid position: '+d.amino_acid_pos+' | Nucleotide position: '+d.nucleotide_pos+'</span></div><div style="margin-bottom:12px">'+getMechTag(d.mech_class)+' '+getBSTag(d.binding_site)+' '+getContactTag(d.ldl_contact)+'</div><div class="card-grid"><div><div class="field"><div class="label">Domain (Reimund 2025)</div><div class="value highlight">'+d.domain+'</div></div><div class="field"><div class="label">Mechanistic Class</div><div class="value">'+(MECH_LABELS[d.mech_class]||d.mech_class)+'</div></div><div class="field"><div class="label">Binding Site</div><div class="value">'+(d.binding_site||'None')+'</div></div><div class="field"><div class="label">LDL Contact (Cryo-EM Confirmed)</div><div class="value '+(d.ldl_contact?'bad':'good')+'">'+(d.ldl_contact?'YES - Direct LDL contact':'No direct LDL contact')+'</div></div><div class="field"><div class="label">PCSK9 Interface</div><div class="value">'+(d.at_pcsk9?'YES (distance: '+d.pcsk9_dist+' A)':'No (distance: '+d.pcsk9_dist+' A)')+'</div></div></div><div><div class="field"><div class="label">AlphaFold3 pLDDT</div><div class="value">'+(d.plddt||'-')+'</div></div><div class="field"><div class="label">FoldX Max ddG</div><div class="value '+(d.max_ddg>2?'bad':d.max_ddg>1?'warn':'good')+'">'+(d.max_ddg!==null?d.max_ddg+' kcal/mol':'Not computed')+'</div></div><div class="field"><div class="label">Rosetta Energy</div><div class="value">'+(d.rosetta!==null?d.rosetta+' REU':'-')+'</div></div><div class="field"><div class="label">Islam et al. Activity</div><div class="value">'+(d.islam_activity!==null?d.islam_activity+'%':'-')+'</div></div>'+(d.sat_mean_ddG!==null?'<div class="field"><div class="label">Saturation Mutagenesis (mean ddG)</div><div class="value">'+d.sat_mean_ddG+' kcal/mol</div></div>':'')+(d.sat_worst_mut?'<div class="field"><div class="label">Most Destabilising Mutation</div><div class="value bad">'+d.sat_worst_mut+' ('+d.sat_worst_ddG+' kcal/mol)</div></div>':'')+'</div><div><div class="field"><div class="label">Domain Penetrance (ASCVD by age 60)</div><div class="value">'+(d.penetrance_60||'-')+'%</div>'+getPenBar(d.penetrance_60)+'</div><div class="field"><div class="label">Risk Classification</div><div class="value '+(d.risk==="Critical"?"bad":d.risk==="High"?"warn":"good")+'">'+d.risk+'</div></div><div class="field"><div class="label">Predicted Treatment Response</div><div class="value">'+d.treatment+'</div></div><div class="field"><div class="label">Drug Target Category</div><div class="value">'+d.drug_target+'</div></div>'+jensson+reimund+'</div></div>'+(d.variants&&d.variants.length>0?'<h3 style="margin-top:20px">Known Variants at This Position</h3><table class="var-table"><thead><tr><th>Variant ID</th><th>c. Notation</th><th>SSS v2</th><th>FoldX ddG</th><th>Type</th></tr></thead><tbody>'+variantRows+'</tbody></table>':'<p style="color:#666;margin-top:15px">No known pathogenic variants at this position in our database</p>')+'</div>';
+  card.innerHTML='<div class="card"><h3>Position '+pos+': '+d.wt_aa+' - '+d.domain+'</h3><div style="margin-bottom:12px"><span class="notation" style="font-size:18px">'+d.p_notation+'</span> &nbsp; <span class="notation" style="font-size:18px">'+d.c_notation+'</span> &nbsp; <span style="color:#888;font-size:13px">Amino acid position: '+d.amino_acid_pos+' | Nucleotide position: '+d.nucleotide_pos+'</span></div><div style="margin-bottom:12px">'+getMechTag(d.mech_class)+' '+getBSTag(d.binding_site)+' '+getContactTag(d.ldl_contact)+'</div><div class="card-grid"><div><div class="field"><div class="label">Domain (Reimund 2025)</div><div class="value highlight">'+d.domain+'</div></div><div class="field"><div class="label">Mechanistic Class</div><div class="value">'+(MECH_LABELS[d.mech_class]||d.mech_class)+'</div></div><div class="field"><div class="label">Binding Site</div><div class="value">'+(d.binding_site||'None')+'</div></div><div class="field"><div class="label">LDL Contact (Cryo-EM Confirmed)</div><div class="value '+(d.ldl_contact?'bad':'good')+'">'+(d.ldl_contact?'YES - Direct LDL contact':'No direct LDL contact')+'</div></div><div class="field"><div class="label">PCSK9 Interface</div><div class="value">'+(d.at_pcsk9?'YES (distance: '+d.pcsk9_dist+' A)':'No (distance: '+d.pcsk9_dist+' A)')+'</div></div></div><div><div class="field"><div class="label">AlphaFold3 pLDDT</div><div class="value">'+(d.plddt||'-')+'</div></div><div class="field"><div class="label">FoldX Max ddG</div><div class="value '+(d.max_ddg>2?'bad':d.max_ddg>1?'warn':'good')+'">'+(d.max_ddg!==null?d.max_ddg+' kcal/mol':'Not computed')+'</div></div><div class="field"><div class="label">Rosetta Energy</div><div class="value">'+(d.rosetta!==null?d.rosetta+' REU':'-')+'</div></div><div class="field"><div class="label">Islam et al. Activity</div><div class="value">'+(d.islam_activity!==null?d.islam_activity+'%':'-')+'</div></div>'+(d.sat_mean_ddG!==null?'<div class="field"><div class="label">Saturation Mutagenesis (mean ddG)</div><div class="value">'+d.sat_mean_ddG+' kcal/mol</div></div>':'')+(d.sat_worst_mut?'<div class="field"><div class="label">Most Destabilising Mutation</div><div class="value bad">'+d.sat_worst_mut+' ('+d.sat_worst_ddG+' kcal/mol)</div></div>':'')+'</div><div><div class="field"><div class="label">Domain Penetrance (ASCVD by age 60)</div><div class="value">'+(d.penetrance_60||'-')+'%</div>'+getPenBar(d.penetrance_60)+'</div><div class="field"><div class="label">Risk Classification</div><div class="value '+(d.risk==="Critical"?"bad":d.risk==="High"?"warn":"good")+'">'+d.risk+'</div></div><div class="field"><div class="label">Predicted Treatment Response</div><div class="value">'+d.treatment+'</div></div><div class="field"><div class="label">Drug Target Category</div><div class="value">'+d.drug_target+'</div></div>'+jensson+reimund+'</div></div>'+(d.variants&&d.variants.length>0?'<h3 style="margin-top:20px">Known Variants at This Position</h3><table class="var-table"><thead><tr><th>Variant ID</th><th>c. Notation</th><th>SSS v2</th><th>FoldX ddG</th><th>Type</th></tr></thead><tbody>'+variantRows+'</tbody></table>':'<p style="color:#666;margin-top:15px">No known pathogenic variants at this position in our database</p>')+getMolExplanation(d)+'</div>';
   if(!_touchMoved)window.scrollTo({top:card.offsetTop-20,behavior:'smooth'});
 }
 
