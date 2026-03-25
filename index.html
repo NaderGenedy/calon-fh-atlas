@@ -19,7 +19,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#0a0a1a;color:#e0e0e0}
 .domain-map{background:#111128;border:1px solid #333;border-radius:8px;padding:20px;margin-bottom:20px}
 .domain-map h2{color:#64b5f6;font-size:18px;margin-bottom:15px}
 .domain-bar{display:flex;height:50px;border-radius:6px;overflow:hidden;margin-bottom:10px}
-.domain-bar .segment{position:relative;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;color:#fff;transition:all 0.2s;border-right:1px solid rgba(0,0,0,0.3);cursor:pointer}
+.domain-bar .segment{position:relative;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:bold;color:#fff;transition:all 0.2s;border-right:1px solid rgba(0,0,0,0.3);cursor:pointer;touch-action:pan-y}
 .domain-bar .segment:hover{filter:brightness(1.3);transform:scaleY(1.1);z-index:1}
 .domain-bar .segment .tooltip{display:none;position:absolute;bottom:55px;left:50%;transform:translateX(-50%);background:#1a1a3e;border:1px solid #2196F3;padding:8px 12px;border-radius:6px;font-size:11px;white-space:nowrap;z-index:100;font-weight:normal}
 .domain-bar .segment:hover .tooltip{display:block}
@@ -136,6 +136,10 @@ const MECH_LABELS = {
 'structural_misfolding':'Structural Misfolding'
 };
 
+var _touchMoved=false;
+document.addEventListener('touchmove',function(){_touchMoved=true},{passive:true});
+document.addEventListener('touchstart',function(){_touchMoved=false},{passive:true});
+
 function buildDomainBar(){
   var bar=document.getElementById('domainBar');
   var legend=document.getElementById('domainLegend');
@@ -153,7 +157,7 @@ function buildDomainBar(){
     tt.innerHTML='<b>'+name+'</b><br>Residues '+d.start+'-'+d.end+' ('+d.n_residues+')<br>p.'+name+' / c.'+((d.start-1)*3+1)+'-'+((d.end-1)*3+3)+'<br>LDL contact: '+(d.ldl_contact?'YES':'No')+'<br>Binding site: '+d.binding_site+'<br>Mechanism: '+d.mech_class+'<br>Penetrance (60y): '+(d.penetrance||'N/A')+'%';
     seg.appendChild(tt);
     seg.setAttribute('data-domain',name);
-    seg.onclick=function(){searchDomain(this.getAttribute('data-domain'))};
+    seg.onclick=function(e){if(_touchMoved){e.preventDefault();return;}searchDomain(this.getAttribute('data-domain'))};
     bar.appendChild(seg);
     var item=document.createElement('div');
     item.className='item';
@@ -247,7 +251,7 @@ function doSearch(query){
     var html='<div class="card"><h3>'+results.length+' positions found</h3><table class="var-table"><thead><tr><th>Position</th><th>p. Notation</th><th>c. Notation</th><th>AA</th><th>Domain</th><th>Mechanism</th><th>Binding Site</th><th>Penetrance</th><th>Max ddG</th></tr></thead><tbody>';
     for(var i=0;i<Math.min(results.length,200);i++){
       var r=results[i];
-      html+='<tr style="cursor:pointer" onclick="showPosition(\''+r.pos+'\')"><td>'+r.pos+'</td><td><span class="notation">'+r.d.p_notation+'</span></td><td><span class="notation">'+r.d.c_notation+'</span></td><td>'+r.d.wt_aa+'</td><td>'+r.d.domain+'</td><td>'+getMechTag(r.d.mech_class)+'</td><td>'+getBSTag(r.d.binding_site)+'</td><td>'+(r.d.penetrance_60||'-')+'%</td><td>'+(r.d.max_ddg!==null?r.d.max_ddg:'-')+'</td></tr>';
+      html+='<tr style="cursor:pointer" onclick="if(!_touchMoved)showPosition(\''+r.pos+'\')"><td>'+r.pos+'</td><td><span class="notation">'+r.d.p_notation+'</span></td><td><span class="notation">'+r.d.c_notation+'</span></td><td>'+r.d.wt_aa+'</td><td>'+r.d.domain+'</td><td>'+getMechTag(r.d.mech_class)+'</td><td>'+getBSTag(r.d.binding_site)+'</td><td>'+(r.d.penetrance_60||'-')+'%</td><td>'+(r.d.max_ddg!==null?r.d.max_ddg:'-')+'</td></tr>';
     }
     html+='</tbody></table></div>';
     document.getElementById('searchResults').innerHTML=html;
