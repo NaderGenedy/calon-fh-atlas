@@ -101,7 +101,7 @@ body{font-family:Arial,Helvetica,sans-serif;background:#0a0a1a;color:#e0e0e0}
 <div class="domain-legend" id="domainLegend"></div>
 </div>
 <div class="search-box">
-<input type="text" id="searchInput" placeholder="Search by position (352), p. notation (p.Cys352), c. notation (c.1055), domain (EGF-A), mechanism (binding_failure)..." autofocus>
+<input type="text" id="searchInput" placeholder="Search by position (352), p. notation (p.Cys352), c. notation (c.1055), domain (EGF-A)...">
 <div class="hint">Examples: 352, p.Cys352, c.1055, EGF-A, binding_failure, BS1, H583, Critical</div>
 </div>
 <div class="result" id="resultCard"></div>
@@ -228,7 +228,7 @@ function showPosition(pos){
     reimund='<div class="field"><div class="label">Reimund et al. Nature 2025 - Cryo-EM Binding Interface</div><div class="value highlight">'+d.reimund_site+'</div><div class="value">'+(d.reimund_func||'N.D.')+'</div></div>';
   }
   card.innerHTML='<div class="card"><h3>Position '+pos+': '+d.wt_aa+' - '+d.domain+'</h3><div style="margin-bottom:12px"><span class="notation" style="font-size:18px">'+d.p_notation+'</span> &nbsp; <span class="notation" style="font-size:18px">'+d.c_notation+'</span> &nbsp; <span style="color:#888;font-size:13px">Amino acid position: '+d.amino_acid_pos+' | Nucleotide position: '+d.nucleotide_pos+'</span></div><div style="margin-bottom:12px">'+getMechTag(d.mech_class)+' '+getBSTag(d.binding_site)+' '+getContactTag(d.ldl_contact)+'</div><div class="card-grid"><div><div class="field"><div class="label">Domain (Reimund 2025)</div><div class="value highlight">'+d.domain+'</div></div><div class="field"><div class="label">Mechanistic Class</div><div class="value">'+(MECH_LABELS[d.mech_class]||d.mech_class)+'</div></div><div class="field"><div class="label">Binding Site</div><div class="value">'+(d.binding_site||'None')+'</div></div><div class="field"><div class="label">LDL Contact (Cryo-EM Confirmed)</div><div class="value '+(d.ldl_contact?'bad':'good')+'">'+(d.ldl_contact?'YES - Direct LDL contact':'No direct LDL contact')+'</div></div><div class="field"><div class="label">PCSK9 Interface</div><div class="value">'+(d.at_pcsk9?'YES (distance: '+d.pcsk9_dist+' A)':'No (distance: '+d.pcsk9_dist+' A)')+'</div></div></div><div><div class="field"><div class="label">AlphaFold3 pLDDT</div><div class="value">'+(d.plddt||'-')+'</div></div><div class="field"><div class="label">FoldX Max ddG</div><div class="value '+(d.max_ddg>2?'bad':d.max_ddg>1?'warn':'good')+'">'+(d.max_ddg!==null?d.max_ddg+' kcal/mol':'Not computed')+'</div></div><div class="field"><div class="label">Rosetta Energy</div><div class="value">'+(d.rosetta!==null?d.rosetta+' REU':'-')+'</div></div><div class="field"><div class="label">Islam et al. Activity</div><div class="value">'+(d.islam_activity!==null?d.islam_activity+'%':'-')+'</div></div>'+(d.sat_mean_ddG!==null?'<div class="field"><div class="label">Saturation Mutagenesis (mean ddG)</div><div class="value">'+d.sat_mean_ddG+' kcal/mol</div></div>':'')+(d.sat_worst_mut?'<div class="field"><div class="label">Most Destabilising Mutation</div><div class="value bad">'+d.sat_worst_mut+' ('+d.sat_worst_ddG+' kcal/mol)</div></div>':'')+'</div><div><div class="field"><div class="label">Domain Penetrance (ASCVD by age 60)</div><div class="value">'+(d.penetrance_60||'-')+'%</div>'+getPenBar(d.penetrance_60)+'</div><div class="field"><div class="label">Risk Classification</div><div class="value '+(d.risk==="Critical"?"bad":d.risk==="High"?"warn":"good")+'">'+d.risk+'</div></div><div class="field"><div class="label">Predicted Treatment Response</div><div class="value">'+d.treatment+'</div></div><div class="field"><div class="label">Drug Target Category</div><div class="value">'+d.drug_target+'</div></div>'+jensson+reimund+'</div></div>'+(d.variants&&d.variants.length>0?'<h3 style="margin-top:20px">Known Variants at This Position</h3><table class="var-table"><thead><tr><th>Variant ID</th><th>c. Notation</th><th>SSS v2</th><th>FoldX ddG</th><th>Type</th></tr></thead><tbody>'+variantRows+'</tbody></table>':'<p style="color:#666;margin-top:15px">No known pathogenic variants at this position in our database</p>')+'</div>';
-  window.scrollTo({top:card.offsetTop-20,behavior:'smooth'});
+  if(!_touchMoved)window.scrollTo({top:card.offsetTop-20,behavior:'smooth'});
 }
 
 function doSearch(query){
@@ -261,7 +261,14 @@ function doSearch(query){
   }
 }
 
-document.getElementById('searchInput').addEventListener('input',function(e){doSearch(e.target.value)});
+var _searchTimer=null;
+document.getElementById('searchInput').addEventListener('input',function(e){
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(function(){doSearch(e.target.value)},400);
+});
+document.getElementById('searchInput').addEventListener('keydown',function(e){
+  if(e.key==='Enter'){clearTimeout(_searchTimer);doSearch(e.target.value);}
+});
 buildDomainBar();
 </script>
 </body>
