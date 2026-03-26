@@ -238,8 +238,8 @@ function buildDomainBar(){
     if(pct>3)seg.textContent=name;
     var tt=document.createElement('div');tt.className='tooltip';
     var penText=d.km?d.km.penetrance_60.toFixed(1)+'%':'N/A';
-    var treatText=d.treat?d.treat.ldl_untreated+' \u2192 '+d.treat.ldl_treated+' mmol/L':'No data';
-    tt.innerHTML='<b>'+name+'</b><br>Residues '+d.start+'\u2013'+d.end+' ('+d.n_residues+')<br>Mechanism: '+d.mech_class+'<br>ASCVD penetrance (60y): '+penText+'<br>LLT response: '+treatText;
+    var treatText=d.treat?'\u2212'+((d.treat.ldl_untreated-d.treat.ldl_treated)/d.treat.ldl_untreated*100).toFixed(0)+'% expected reduction':'No data';
+    tt.innerHTML='<b>'+name+'</b><br>Residues '+d.start+'\u2013'+d.end+' ('+d.n_residues+')<br>Mechanism: '+d.mech_class+'<br>ASCVD penetrance (60y): '+penText+'<br>Expected LLT response: '+treatText;
     seg.appendChild(tt);seg.setAttribute('data-domain',name);
     seg.onclick=function(e){if(_touchMoved){e.preventDefault();return;}searchDomain(this.getAttribute('data-domain'))};
     bar.appendChild(seg);
@@ -330,35 +330,32 @@ function getLLTPanel(d){
     }
   }
 
-  var h='<div class="panel"><h3>Lipid-Lowering Therapy Response &mdash; ';
+  var h='<div class="panel"><h3>Expected Treatment Response</h3>';
   if(hasVariantLLT){
-    h+='Wales FH / DRAGON3 Cohort (Variant-Level)</h3>';
     for(var i=0;i<variantLLT.length;i++){
       var v=variantLLT[i],llt=v.llt;
       var pct=llt.ldl_pct_reduction;
-      h+='<div style="margin-bottom:12px"><div style="font-size:13px;margin-bottom:6px"><span class="notation">'+v.id+'</span> &mdash; n='+llt.n_treated+' treated patients ('+llt.intensity+' intensity)</div>';
-      h+='<div class="llt-bar-wrap"><div class="llt-label">Before LLT</div><div class="llt-bar"><div class="fill" style="width:'+Math.min(llt.ldl_before/8*100,100)+'%;background:#ef5350"></div><div class="txt">'+llt.ldl_before+' mmol/L</div></div></div>';
-      if(llt.ldl_after!==null){
-        h+='<div class="llt-bar-wrap"><div class="llt-label">On LLT</div><div class="llt-bar"><div class="fill" style="width:'+Math.min(llt.ldl_after/8*100,100)+'%;background:#66bb6a"></div><div class="txt">'+llt.ldl_after+' mmol/L</div></div></div>';
-        h+='<div style="text-align:center;margin-top:4px;font-size:14px;font-weight:bold;color:'+(pct>25?'#4caf50':'#ff9800')+'">'+pct.toFixed(1)+'% LDL-C reduction</div>';
-      }
-      h+='</div>';
+      var resp=pct>35?'Good':'Partial';
+      var respCol=pct>35?'#4caf50':'#ff9800';
+      h+='<div style="margin-bottom:12px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px">';
+      h+='<div style="font-size:13px;margin-bottom:8px"><span class="notation">'+v.id+'</span> &mdash; n='+llt.n_treated+' patients ('+llt.intensity+' intensity)</div>';
+      h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
+      h+='<div class="metric '+(pct>35?'green':'amber')+'" style="margin:0"><div class="big">\u2212'+pct.toFixed(0)+'%</div><div class="sub">Expected LDL-C reduction</div></div>';
+      h+='<div style="font-size:14px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+respCol+';margin-right:6px"></span><b>'+resp+' responder</b></div>';
+      h+='</div></div>';
     }
-    h+='<div class="src">Source: DRAGON3/Wales FH Registry patient-level data. Validated against Islam et al. functional assay.</div>';
+    h+='<div class="src">Source: DRAGON3/Wales FH Registry (variant-level). Validated against Islam et al. functional assay.</div>';
   }else if(d.treat){
-    // Fall back to domain-level data
     var t=d.treat;
-    var pct=((t.ldl_untreated-t.ldl_treated)/t.ldl_untreated*100).toFixed(0);
-    h+='Domain-Level ('+d.domain+')</h3>';
-    h+='<div class="panel-grid"><div>';
-    h+='<div class="llt-bar-wrap"><div class="llt-label">Untreated</div><div class="llt-bar"><div class="fill" style="width:'+Math.min(t.ldl_untreated/8*100,100)+'%;background:#ef5350"></div><div class="txt">'+t.ldl_untreated+' mmol/L</div></div></div>';
-    h+='<div class="llt-bar-wrap"><div class="llt-label">On LLT</div><div class="llt-bar"><div class="fill" style="width:'+Math.min(t.ldl_treated/8*100,100)+'%;background:#66bb6a"></div><div class="txt">'+t.ldl_treated+' mmol/L</div></div></div>';
-    h+='</div><div>';
-    h+='<div class="metric '+(pct>25?'green':'amber')+'"><div class="big">\u2212'+pct+'%</div><div class="sub">LDL-C reduction</div></div>';
-    h+='<div style="text-align:center;margin-top:6px;font-size:12px;color:'+(t.p_value<0.05?'#4caf50':'#ff9800')+'">P = '+t.p_value+(t.p_value<0.05?' (significant)':' (NS)')+'</div>';
-    h+='<div style="text-align:center;font-size:10px;color:#666">n='+t.n_untreated+' untreated, n='+t.n_treated+' treated</div>';
-    h+='</div></div>';
-    h+='<div class="src">Source: UK Biobank + Wales FH domain-level analysis. Validated against Islam et al. functional data.</div>';
+    var pct=((t.ldl_untreated-t.ldl_treated)/t.ldl_untreated*100);
+    var resp=pct>35?'Good':'Partial';
+    var respCol=pct>35?'#4caf50':'#ff9800';
+    h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px">';
+    h+='<div class="metric '+(pct>25?'green':'amber')+'" style="margin:0"><div class="big">\u2212'+pct.toFixed(0)+'%</div><div class="sub">Expected LDL-C reduction</div></div>';
+    h+='<div><div style="font-size:14px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+respCol+';margin-right:6px"></span><b>'+resp+' responder</b> ('+d.domain+' domain)</div>';
+    h+='<div style="font-size:11px;color:#999;margin-top:4px">n='+t.n_treated+' treated, P='+(t.p_value<0.001?'<0.001':t.p_value)+'</div></div>';
+    h+='</div>';
+    h+='<div class="src">Source: UK Biobank + Wales FH domain-level analysis. Validated against Islam et al.</div>';
   }else{
     return '';
   }
