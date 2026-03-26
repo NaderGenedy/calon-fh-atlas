@@ -320,6 +320,54 @@ function getPenetrancePanel(d){
   return h;
 }
 
+function getRxRec(d){
+  // Mechanism-based medication recommendation from our cohort data
+  var mc=d.mech_class||'';var dom=d.domain||'';
+  var first='',escalate='',rationale='',caution='';
+  if(mc==='binding_failure'&&d.ldl_contact){
+    first='Atorvastatin 40\u201380 mg + Ezetimibe 10 mg';
+    escalate='Add PCSK9i (evolocumab 140 mg Q2W or alirocumab 150 mg Q2W). If LDL-C remains >2.6 mmol/L: consider evinacumab (LDLR-independent, ANGPTL3 pathway).';
+    rationale='Direct LDL-contact residue at BS1. Mutant allele cannot bind LDL regardless of LDLR expression level. Statin benefit comes primarily from upregulating the <b>wild-type allele</b>. Ezetimibe provides additive 10.8% reduction (our cohort: statin alone 3.7% vs statin+ezetimibe 10.8%).';
+    caution='Statin monotherapy has limited effect via the mutant allele. Early combination therapy recommended.';
+  }else if(mc==='recycling_failure'){
+    first='Atorvastatin 40\u201380 mg + Ezetimibe 10 mg';
+    escalate='PCSK9i may have <b>reduced incremental benefit</b> (receptor recycling already impaired). If inadequate response: evinacumab or lipoprotein apheresis.';
+    rationale='pH-switch residue mutation. Receptor binds and internalises LDL normally but is degraded after a single cycle (vs \u223C100 cycles normally). Statins partially compensate by driving new receptor synthesis, but each receptor molecule is only used once.';
+    caution='PCSK9 inhibitors prevent PCSK9-mediated degradation, but these receptors are already lost via the pH-switch recycling failure pathway \u2014 different mechanism.';
+  }else if(mc==='recycling_pivot'){
+    first='Atorvastatin 40\u201380 mg + Ezetimibe 10 mg';
+    escalate='Add PCSK9i. If LDL-C >3.5 mmol/L on triple therapy: lipoprotein apheresis referral.';
+    rationale='EGF-B hinge domain mutation impairs the conformational change required for LDL release at endosomal pH. Similar to recycling failure but may retain partial function.';
+    caution='Monitor LDL-C response at 6\u20138 weeks. Partial recycling may preserve some statin responsiveness.';
+  }else if(mc==='interface_BS2'||dom.indexOf('Beta-propeller')>=0||dom.indexOf('beta_propeller')>=0){
+    first='Atorvastatin 40\u201380 mg (or Rosuvastatin 20\u201340 mg)';
+    escalate='Add Ezetimibe 10 mg if LDL-C >2.6 mmol/L. Then PCSK9i if LDL-C remains >1.8 mmol/L (very high risk) or >2.6 mmol/L (high risk).';
+    rationale='<b>Best documented treatment response in our cohort.</b> Beta-propeller domain: expected \u221233% LDL-C reduction (5.06\u21923.41 mmol/L, P=0.001, n=63). BS1 (primary LDL binding) is intact. PCSK9 binding site (EGF-A) is structurally intact \u2192 PCSK9i expected to be effective.';
+    caution='';
+  }else if(dom.indexOf('Cytoplasmic')>=0||dom.indexOf('NPXY')>=0){
+    first='Evinacumab 15 mg/kg IV Q4W (LDLR-independent)';
+    escalate='Lipoprotein apheresis if evinacumab unavailable. Statins + ezetimibe as adjuncts for wild-type allele benefit.';
+    rationale='<b>Class 5 internalisation defect.</b> Receptor reaches the cell surface and binds LDL but cannot be recruited to clathrin-coated pits (NPXY motif disrupted). Statins upregulate a non-internalising receptor. PCSK9i prevents degradation of a receptor that is already surface-stable but non-functional for endocytosis.';
+    caution='Neither statins nor PCSK9i directly address the endocytic defect. LDLR-independent pathways (ANGPTL3 inhibition) bypass the receptor entirely.';
+  }else if(dom.indexOf('EGF-A')>=0||dom.indexOf('EGF-like A')>=0){
+    first='Atorvastatin 40\u201380 mg + Ezetimibe 10 mg';
+    escalate='PCSK9i: <b>check specific residue</b> \u2014 EGF-A contains the PCSK9 binding epitope. If mutation disrupts PCSK9 binding, PCSK9i may be ineffective (the drug cannot bind its target). Alternative: inclisiran (siRNA, different mechanism) or evinacumab.';
+    rationale='EGF-A has a dual role: LDL binding (BS1 component) AND PCSK9 binding. Mutations here may simultaneously impair LDL clearance and alter the efficacy of PCSK9-targeted therapies.';
+    caution='AlphaFold3 PCSK9 complex modelling recommended to assess PCSK9i binding impact at this specific position.';
+  }else if(d.sss_mean>=0.7){
+    first='Atorvastatin 40\u201380 mg + Ezetimibe 10 mg';
+    escalate='Add PCSK9i early. If SSS \u22650.9 (likely null): refer for evinacumab or apheresis evaluation.';
+    rationale='High structural severity (SSS \u22650.7) suggests significant protein destabilisation or loss-of-function. In our cohort, high-SSS variants in the ligand-binding domain showed only \u22121.9% mean LDL reduction on statin monotherapy.';
+    caution='Null/severe mutations: mutant allele contributes minimally to LDL clearance regardless of treatment.';
+  }else{
+    first='Atorvastatin 20\u201340 mg';
+    escalate='Uptitrate to high-intensity (Atorvastatin 80 mg or Rosuvastatin 40 mg). Add Ezetimibe 10 mg if LDL-C >2.6 mmol/L. Add PCSK9i if LDL-C remains above target after 6\u20138 weeks.';
+    rationale='Moderate structural risk. Standard FH escalation pathway. Monitor LDL-C at 6\u20138 weeks after each change. Target: <1.8 mmol/L (very high risk) or <2.6 mmol/L (high risk) per ESC/EAS 2019.';
+    caution='';
+  }
+  return {first:first,escalate:escalate,rationale:rationale,caution:caution};
+}
+
 function getLLTPanel(d){
   // Check for variant-level LLT first (our actual patient data)
   var hasVariantLLT=false;
@@ -330,35 +378,60 @@ function getLLTPanel(d){
     }
   }
 
-  var h='<div class="panel"><h3>Expected Treatment Response</h3>';
+  var h='<div class="panel"><h3>\uD83D\uDC8A Treatment Strategy &mdash; Mechanism-Based</h3>';
+
+  // Expected response section
   if(hasVariantLLT){
+    h+='<div style="margin-bottom:14px;padding:10px;background:rgba(76,175,80,0.06);border-radius:8px;border-left:3px solid #4caf50">';
+    h+='<div style="font-size:12px;color:#4caf50;font-weight:600;margin-bottom:8px">OBSERVED RESPONSE (Our Cohort)</div>';
     for(var i=0;i<variantLLT.length;i++){
       var v=variantLLT[i],llt=v.llt;
       var pct=llt.ldl_pct_reduction;
       var resp=pct>35?'Good':'Partial';
       var respCol=pct>35?'#4caf50':'#ff9800';
-      h+='<div style="margin-bottom:12px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px">';
-      h+='<div style="font-size:13px;margin-bottom:8px"><span class="notation">'+v.id+'</span> &mdash; n='+llt.n_treated+' patients ('+llt.intensity+' intensity)</div>';
-      h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
-      h+='<div class="metric '+(pct>35?'green':'amber')+'" style="margin:0"><div class="big">\u2212'+pct.toFixed(0)+'%</div><div class="sub">Expected LDL-C reduction</div></div>';
-      h+='<div style="font-size:14px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+respCol+';margin-right:6px"></span><b>'+resp+' responder</b></div>';
-      h+='</div></div>';
+      h+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">';
+      h+='<span class="notation">'+v.id+'</span>';
+      h+='<span style="font-size:18px;font-weight:700;color:'+respCol+'">\u2212'+pct.toFixed(0)+'%</span>';
+      h+='<span style="font-size:13px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+respCol+';margin-right:4px"></span>'+resp+' responder (n='+llt.n_treated+', '+llt.intensity+' intensity)</span>';
+      h+='</div>';
     }
-    h+='<div class="src">Source: DRAGON3/Wales FH Registry (variant-level). Validated against Islam et al. functional assay.</div>';
+    h+='<div class="src" style="margin-top:6px">Source: DRAGON3/Wales FH Registry. Validated against Islam et al.</div></div>';
   }else if(d.treat){
     var t=d.treat;
     var pct=((t.ldl_untreated-t.ldl_treated)/t.ldl_untreated*100);
-    var resp=pct>35?'Good':'Partial';
-    var respCol=pct>35?'#4caf50':'#ff9800';
-    h+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px">';
-    h+='<div class="metric '+(pct>25?'green':'amber')+'" style="margin:0"><div class="big">\u2212'+pct.toFixed(0)+'%</div><div class="sub">Expected LDL-C reduction</div></div>';
-    h+='<div><div style="font-size:14px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:'+respCol+';margin-right:6px"></span><b>'+resp+' responder</b> ('+d.domain+' domain)</div>';
-    h+='<div style="font-size:11px;color:#999;margin-top:4px">n='+t.n_treated+' treated, P='+(t.p_value<0.001?'<0.001':t.p_value)+'</div></div>';
+    var resp=pct>30?'Good':'Partial';
+    var respCol=pct>30?'#4caf50':'#ff9800';
+    h+='<div style="margin-bottom:14px;padding:10px;background:rgba(76,175,80,0.06);border-radius:8px;border-left:3px solid #66bb6a">';
+    h+='<div style="font-size:12px;color:#66bb6a;font-weight:600;margin-bottom:8px">EXPECTED RESPONSE (Domain-Level)</div>';
+    h+='<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+    h+='<span style="font-size:18px;font-weight:700;color:'+respCol+'">\u2212'+pct.toFixed(0)+'%</span>';
+    h+='<span style="font-size:13px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+respCol+';margin-right:4px"></span>'+resp+' responder ('+d.domain+', n='+t.n_treated+', P='+(t.p_value<0.001?'<0.001':t.p_value)+')</span>';
     h+='</div>';
-    h+='<div class="src">Source: UK Biobank + Wales FH domain-level analysis. Validated against Islam et al.</div>';
-  }else{
-    return '';
+    h+='<div class="src" style="margin-top:6px">Source: UK Biobank + Wales FH. Validated against Islam et al.</div></div>';
   }
+
+  // Medication recommendation
+  var rx=getRxRec(d);
+  h+='<div style="margin-bottom:10px">';
+  h+='<div style="font-size:12px;color:#64b5f6;font-weight:600;margin-bottom:8px">RECOMMENDED FIRST-LINE</div>';
+  h+='<div style="padding:10px;background:rgba(100,181,246,0.08);border-radius:8px;border-left:3px solid #64b5f6;font-size:14px;font-weight:500">'+rx.first+'</div>';
+  h+='</div>';
+
+  h+='<div style="margin-bottom:10px">';
+  h+='<div style="font-size:12px;color:#ffb74d;font-weight:600;margin-bottom:8px">ESCALATION IF LDL-C NOT AT TARGET</div>';
+  h+='<div style="padding:10px;background:rgba(255,183,77,0.08);border-radius:8px;border-left:3px solid #ffb74d;font-size:13px">'+rx.escalate+'</div>';
+  h+='</div>';
+
+  h+='<div style="margin-bottom:10px">';
+  h+='<div style="font-size:12px;color:#ce93d8;font-weight:600;margin-bottom:8px">STRUCTURAL RATIONALE</div>';
+  h+='<div style="padding:10px;background:rgba(206,147,216,0.06);border-radius:8px;font-size:12px;line-height:1.5;color:#ccc">'+rx.rationale+'</div>';
+  h+='</div>';
+
+  if(rx.caution){
+    h+='<div style="padding:8px 10px;background:rgba(239,83,80,0.08);border-radius:8px;border-left:3px solid #ef5350;font-size:12px;color:#ef9a9a">';
+    h+='<b>\u26A0 Clinical note:</b> '+rx.caution+'</div>';
+  }
+
   h+='</div>';
   return h;
 }
